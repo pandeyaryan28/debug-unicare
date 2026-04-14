@@ -1,0 +1,314 @@
+﻿
+> unicare@0.1.0 build
+> next build
+
+node.exe : ΓÜá Warning: 
+Next.js inferred your 
+workspace root, but it 
+may not be correct.
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" "C:
+\Users\aarya\AppData\Roami
+ng\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: (Γ  
+  Üá Warning: Ne...not    
+ be correct.:String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+ We detected multiple 
+lockfiles and selected 
+the directory of C:\Users\
+aarya\package-lock.json 
+as the root directory.
+ To silence this warning, 
+set `turbopack.root` in 
+your Next.js config, or 
+consider removing one of 
+the lockfiles if it's not 
+needed.
+   See https://nextjs.org/
+docs/app/api-reference/con
+fig/next-config-js/turbopa
+ck#root-directory for 
+more information.
+ Detected additional 
+lockfiles: 
+   * C:\Users\aarya\Docume
+nts\unicare\package-lock.j
+son
+
+Γû▓ Next.js 16.2.2 (Turbopack)
+
+  Creating an optimized production build ...
+Error: Can't resolve 
+'tailwindcss-animate' in '
+C:\Users\aarya\Documents\u
+nicare\src\app'
+    [2m[at 
+finishWithoutResolve (C:\U
+sers\aarya\Documents\unica
+re\node_modules\enhanced-r
+esolve\lib\Resolver.js:587
+:18)][0m
+    [2m[at C:\Users\aarya
+\Documents\unicare\node_mo
+dules\enhanced-resolve\lib
+\Resolver.js:679:14][0m
+    [2m[at C:\Users\aarya
+\Documents\unicare\node_mo
+dules\enhanced-resolve\lib
+\Resolver.js:740:5][0m
+    [2m[at eval (eval at 
+create (C:\Users\aarya\Doc
+uments\unicare\node_module
+s\tapable\lib\HookCodeFact
+ory.js:31:10), 
+<anonymous>:15:1)][0m
+    [2m[at C:\Users\aarya
+\Documents\unicare\node_mo
+dules\enhanced-resolve\lib
+\Resolver.js:740:5][0m
+    [2m[at eval (eval at 
+create (C:\Users\aarya\Doc
+uments\unicare\node_module
+s\tapable\lib\HookCodeFact
+ory.js:31:10), 
+<anonymous>:27:1)][0m
+    [2m[at C:\Users\aarya
+\Documents\unicare\node_mo
+dules\enhanced-resolve\lib
+\DescriptionFilePlugin.js:
+89:43][0m
+    [2m[at C:\Users\aarya
+\Documents\unicare\node_mo
+dules\enhanced-resolve\lib
+\Resolver.js:740:5][0m
+    [2m[at eval (eval at 
+create (C:\Users\aarya\Doc
+uments\unicare\node_module
+s\tapable\lib\HookCodeFact
+ory.js:31:10), 
+<anonymous>:15:1)][0m
+    [2m[at C:\Users\aarya
+\Documents\unicare\node_mo
+dules\enhanced-resolve\lib
+\Resolver.js:740:5][0m {
+  details: "resolve 
+'tailwindcss-animate' in '
+C:\\Users\\aarya\\Document
+s\\unicare\\src\\app'\n" +
+    '  Parsed request is 
+a module\n' +
+    '  using description 
+file: C:\\Users\\aarya\\Do
+cuments\\unicare\\package.
+json (relative path: 
+./src/app)\n' +
+    '    resolve as 
+module\n' +
+    "      C:\\Users\\aary
+a\\Documents\\unicare\\src
+\\app\\node_modules 
+doesn't exist or is not a 
+directory\n" +
+    "      C:\\Users\\aary
+a\\Documents\\unicare\\src
+\\node_modules doesn't 
+exist or is not a 
+directory\n" +
+    '      looking for 
+modules in C:\\Users\\aary
+a\\Documents\\unicare\\nod
+e_modules\n' +
+    '        single file 
+module\n' +
+    '          using 
+description file: C:\\User
+s\\aarya\\Documents\\unica
+re\\package.json 
+(relative path: ./node_mod
+ules/tailwindcss-animate)\
+n' +
+    '            no 
+extension\n' +
+    "              C:\\Use
+rs\\aarya\\Documents\\unic
+are\\node_modules\\tailwin
+dcss-animate doesn't 
+exist\n" +
+    '            .js\n' +
+    "              C:\\Use
+rs\\aarya\\Documents\\unic
+are\\node_modules\\tailwin
+dcss-animate.js doesn't 
+exist\n" +
+    '            .json\n' 
++
+    "              C:\\Use
+rs\\aarya\\Documents\\unic
+are\\node_modules\\tailwin
+dcss-animate.json doesn't 
+exist\n" +
+    '            .node\n' 
++
+    "              C:\\Use
+rs\\aarya\\Documents\\unic
+are\\node_modules\\tailwin
+dcss-animate.node doesn't 
+exist\n" +
+    '            .ts\n' +
+    "              C:\\Use
+rs\\aarya\\Documents\\unic
+are\\node_modules\\tailwin
+dcss-animate.ts doesn't 
+exist\n" +
+    "        C:\\Users\\aa
+rya\\Documents\\unicare\\n
+ode_modules\\tailwindcss-a
+nimate doesn't exist\n" +
+    "      C:\\Users\\aary
+a\\Documents\\node_modules
+ doesn't exist or is not 
+a directory\n" +
+    '      looking for 
+modules in C:\\Users\\aary
+a\\node_modules\n' +
+    '        single file 
+module\n' +
+    '          using 
+description file: C:\\User
+s\\aarya\\package.json 
+(relative path: ./node_mod
+ules/tailwindcss-animate)\
+n' +
+    '            no 
+extension\n' +
+    "              C:\\Use
+rs\\aarya\\node_modules\\t
+ailwindcss-animate 
+doesn't exist\n" +
+    '            .js\n' +
+    "              C:\\Use
+rs\\aarya\\node_modules\\t
+ailwindcss-animate.js 
+doesn't exist\n" +
+    '            .json\n' 
++
+    "              C:\\Use
+rs\\aarya\\node_modules\\t
+ailwindcss-animate.json 
+doesn't exist\n" +
+    '            .node\n' 
++
+    "              C:\\Use
+rs\\aarya\\node_modules\\t
+ailwindcss-animate.node 
+doesn't exist\n" +
+    '            .ts\n' +
+    "              C:\\Use
+rs\\aarya\\node_modules\\t
+ailwindcss-animate.ts 
+doesn't exist\n" +
+    "        C:\\Users\\aa
+rya\\node_modules\\tailwin
+dcss-animate doesn't 
+exist\n" +
+    "      
+C:\\Users\\node_modules 
+doesn't exist or is not a 
+directory\n" +
+    "      
+C:\\node_modules doesn't 
+exist or is not a 
+directory"
+}
+
+> Build error occurred
+Error: Turbopack build 
+failed with 1 errors:
+./Documents/unicare/src/ap
+p/globals.css
+Error evaluating Node.js 
+code
+CssSyntaxError: 
+tailwindcss: C:\Users\aary
+a\Documents\unicare\src\ap
+p\globals.css:1:1: Can't 
+resolve 
+'tailwindcss-animate' in '
+C:\Users\aarya\Documents\u
+nicare\src\app'
+    at Input.error (Docume
+nts/unicare/node_modules/p
+ostcss/lib/input.js:135:16
+) [C:\Users\aarya\Document
+s\unicare\.next\build\chun
+ks\0zks_0kgrp7p._.js:4651:
+22]
+    at error (Documents/un
+icare/node_modules/postcss
+/lib/node.js:146:32) [C:\U
+sers\aarya\Documents\unica
+re\.next\build\chunks\0zks
+_0kgrp7p._.js:928:38]
+    [at Object.Once (C:\Us
+ers\aarya\Documents\unicar
+e\node_modules\@tailwindcs
+s\postcss\dist\index.js:10
+:6913)]
+    at async 
+LazyResult.runAsync (Docum
+ents/unicare/node_modules/
+postcss/lib/lazy-result.js
+:293:11) [C:\Users\aarya\D
+ocuments\unicare\.next\bui
+ld\chunks\0zks_0kgrp7p._.j
+s:6214:21]
+    at async transform (tu
+rbopack:///[turbopack-node
+]/transforms/postcss.ts:70
+:34) [C:\Users\aarya\Docum
+ents\unicare\.next\build\c
+hunks\[root-of-the-server]
+__0dxoo9h._.js:146:36]
+    at async run (turbopac
+k:///[turbopack-node]/chil
+d_process/evaluate.ts:89:2
+3) [C:\Users\aarya\Documen
+ts\unicare\.next\build\chu
+nks\[root-of-the-server]__
+0ycw~1f._.js:443:31]
+
+Import trace:
+  Client Component 
+Browser:
+    ./Documents/unicare/sr
+c/app/globals.css [Client 
+Component Browser]
+    ./Documents/unicare/sr
+c/app/layout.tsx [Server 
+Component]
+
+
+    at async transform (tu
+rbopack:///[turbopack-node
+]/transforms/postcss.ts:70
+:34) [C:\Users\aarya\Docum
+ents\unicare\.next\build\c
+hunks\[root-of-the-server]
+__0dxoo9h._.js:146:36])
+    at async run (turbopac
+k:///[turbopack-node]/chil
+d_process/evaluate.ts:89:2
+3) [C:\Users\aarya\Documen
+ts\unicare\.next\build\chu
+nks\[root-of-the-server]__
+0ycw~1f._.js:443:31])
