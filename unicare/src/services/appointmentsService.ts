@@ -172,3 +172,40 @@ export const deleteAppointment = async (id: string): Promise<void> => {
     .eq("id", id);
   if (error) throw new Error(error.message);
 };
+
+// ─── Estimated visit time helpers ─────────────────────────────────────────────
+// Stored as "[est-time: HH:MM]\n" prefix in the notes field.
+// No schema change needed.
+
+const EST_TIME_PREFIX = /^\[est-time:\s*(\d{2}:\d{2})\]\n?/;
+
+/**
+ * Encodes an optional estimated time into the notes string.
+ * e.g. encodeEstimatedTime("Chest pain", "10:30") → "[est-time: 10:30]\nChest pain"
+ */
+export function encodeEstimatedTime(
+  notes: string | undefined,
+  time: string | undefined
+): string | undefined {
+  const cleanNotes = notes?.trim() || undefined;
+  if (!time) return cleanNotes;
+  const prefix = `[est-time: ${time}]`;
+  return cleanNotes ? `${prefix}\n${cleanNotes}` : prefix;
+}
+
+/**
+ * Parses and removes the estimated time tag from a notes string.
+ * Returns { time: "10:30" | null, cleanNotes: "..." | null }
+ */
+export function parseEstimatedTime(notes: string | null): {
+  time: string | null;
+  cleanNotes: string | null;
+} {
+  if (!notes) return { time: null, cleanNotes: null };
+  const match = notes.match(EST_TIME_PREFIX);
+  if (!match) return { time: null, cleanNotes: notes || null };
+  const time = match[1];
+  const cleanNotes = notes.replace(EST_TIME_PREFIX, "").trim() || null;
+  return { time, cleanNotes };
+}
+

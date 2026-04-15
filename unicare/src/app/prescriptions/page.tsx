@@ -1,12 +1,12 @@
 "use client";
 
-import AppointmentsSection from "@/components/ui/AppointmentsSection";
+import PrescriptionsSection from "@/components/ui/PrescriptionsSection";
 
-export default function AppointmentsPage() {
+export default function PrescriptionsPage() {
   return (
     <div className="px-6 py-8 md:px-0 md:py-12 flex flex-col items-center">
       <div className="w-full max-w-2xl">
-        <AppointmentsSection />
+        <PrescriptionsSection />
       </div>
     </div>
   );

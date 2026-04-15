@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { 
   Users, LogOut, Plus, Shield, ChevronRight, 
   Menu, X, LayoutDashboard,
-  ClipboardList, Sun, Moon, CalendarCheck
+  ClipboardList, Sun, Moon, CalendarCheck, Pill
 } from "lucide-react";
 import { useProfile } from "@/components/auth/ProfileContext";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -28,6 +28,7 @@ export default function Sidebar() {
   const navItems = [
     { name: "Records Vault", icon: LayoutDashboard, href: "/" },
     { name: "Appointments", icon: CalendarCheck, href: "/appointments" },
+    { name: "Prescriptions", icon: Pill, href: "/prescriptions" },
     { name: "Medical History", icon: ClipboardList, href: "/medical-history" },
     { name: "Family Profiles", icon: Users, href: "/profiles" },
   ];
