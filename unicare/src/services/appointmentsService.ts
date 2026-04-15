@@ -1,11 +1,14 @@
 import { supabase } from "@/lib/supabase";
 
 export type AppointmentStatus =
-  | "upcoming"
-  | "confirmed"
+  | "pending"       // Patient-submitted via patient app; awaiting doctor confirmation
+  | "upcoming"      // Confirmed / self-scheduled (general appointments)
+  | "confirmed"     // Explicitly confirmed by doctor
   | "cancelled"
   | "checked_in"
   | "completed";
+
+export type AppointmentSource = "patient_app" | "doctor_app";
 
 export interface Appointment {
   id: string;
@@ -18,6 +21,8 @@ export interface Appointment {
   date: string;               // ISO UTC string
   notes: string | null;
   status: AppointmentStatus;
+  source: AppointmentSource;  // 'patient_app' | 'doctor_app'
+  idempotency_key: string | null;
   packet_id: string | null;
   timezone: string;           // e.g. 'Asia/Kolkata'
   created_at: string;
@@ -32,6 +37,8 @@ export interface CreateAppointmentInput {
   date: Date;
   notes?: string;
   status?: AppointmentStatus;
+  source?: AppointmentSource; // defaults to 'patient_app'
+  idempotencyKey?: string;    // stable UUID to prevent duplicate submissions
   packetId?: string;
   timezone?: string;
 }
@@ -119,6 +126,11 @@ export const getProfileAppointments = async (
 export const createAppointment = async (
   input: CreateAppointmentInput
 ): Promise<Appointment> => {
+  const source = input.source ?? "patient_app";
+  // Patient-app bookings always start as 'pending' (require doctor confirmation)
+  // unless an explicit status override is passed (for backward compat / doctor-side creates)
+  const status = input.status ?? (source === "patient_app" ? "pending" : "upcoming");
+
   const { data, error } = await supabase
     .from("appointments")
     .insert({
@@ -129,7 +141,9 @@ export const createAppointment = async (
       location: input.location || null,
       date: input.date.toISOString(),
       notes: input.notes || null,
-      status: input.status || "upcoming",
+      status,
+      source,
+      idempotency_key: input.idempotencyKey || null,
       packet_id: input.packetId || null,
       timezone: input.timezone || "Asia/Kolkata",
     })

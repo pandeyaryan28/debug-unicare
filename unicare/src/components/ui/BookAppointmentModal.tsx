@@ -5,7 +5,7 @@ import {
   X, Search, Loader2, AlertCircle, CheckCircle2,
   Stethoscope, Building2, CalendarDays, Clock, FileText,
   ChevronRight, FolderHeart, ShieldCheck, MapPin, User,
-  Link2, ChevronLeft, Info, Pencil,
+  Link2, ChevronLeft, Info, Pencil, ScanLine,
 } from "lucide-react";
 import {
   lookupClinicCode,
@@ -15,6 +15,12 @@ import {
 } from "@/services/appointmentsService";
 import { getUserRecords, HealthRecord, createPacketLink } from "@/services/recordsService";
 import { useProfile } from "../auth/ProfileContext";
+import { useAuth } from "../auth/AuthProvider";
+import { resolveDoctorFromScannedQr } from "@/services/qrIdentityService";
+import dynamic from "next/dynamic";
+
+// Dynamically import scanner modal to avoid SSR issues with html5-qrcode
+const QrScannerModal = dynamic(() => import("./QrScannerModal"), { ssr: false });
 
 interface BookAppointmentModalProps {
   onClose: () => void;
@@ -192,7 +198,10 @@ function PacketSection({
 
 export default function BookAppointmentModal({ onClose, onSuccess }: BookAppointmentModalProps) {
   const { activeProfile } = useProfile();
+  const { user } = useAuth();
   const [mode, setMode] = useState<BookingMode>("choose");
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanResolving, setScanResolving] = useState(false);
 
   // ── UniCare flow state ──
   const [code, setCode] = useState("");
@@ -221,6 +230,9 @@ export default function BookAppointmentModal({ onClose, onSuccess }: BookAppoint
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Stable idempotency key for this booking session (prevents double-submit)
+  const idempotencyKeyRef = useRef<string>(crypto.randomUUID());
+
   useEffect(() => {
     if (activeProfile) {
       setRecordsLoading(true);
@@ -232,6 +244,59 @@ export default function BookAppointmentModal({ onClose, onSuccess }: BookAppoint
   }, [activeProfile]);
 
   useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+
+  // ── Camera scan result handler ──
+  const handleScanResult = async (raw: string) => {
+    setShowScanner(false);
+    setScanResolving(true);
+    setCodeError(null);
+    setDoctor(null);
+
+    // Log scan attempt (fire-and-forget)
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      supabase.from("audit_logs").insert({
+        event_type: "scan_attempt",
+        actor_id: user?.id ?? null,
+        payload: { raw_length: raw.length },
+      }).then(() => {});
+    } catch { /* non-critical */ }
+
+    try {
+      const resolved = await resolveDoctorFromScannedQr(raw);
+      if (!resolved) {
+        setCodeError("Could not identify a valid doctor QR. Try entering the code manually.");
+        // Log rejection
+        try {
+          const { supabase } = await import("@/lib/supabase");
+          supabase.from("audit_logs").insert({
+            event_type: "scan_rejected",
+            actor_id: user?.id ?? null,
+            payload: { reason: "unresolved" },
+          }).then(() => {});
+        } catch { /* non-critical */ }
+        return;
+      }
+      // Populate code + doctor from scan result
+      setCode(resolved.code);
+      setDoctor(resolved);
+      // Log success
+      try {
+        const { supabase } = await import("@/lib/supabase");
+        supabase.from("audit_logs").insert({
+          event_type: "scan_resolved",
+          actor_id: user?.id ?? null,
+          target_id: resolved.doctor_id,
+          payload: { clinic_code: resolved.code },
+        }).then(() => {});
+      } catch { /* non-critical */ }
+    } catch {
+      setCodeError("Scan resolution failed. Please try again or enter the code manually.");
+    } finally {
+      setScanResolving(false);
+    }
+  };
+
 
   // ── Code lookup ──
   const handleCodeChange = (raw: string) => {
@@ -264,6 +329,12 @@ export default function BookAppointmentModal({ onClose, onSuccess }: BookAppoint
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeProfile) return;
+
+    // Ownership check: only allow booking for profiles belonging to this user
+    if (user && activeProfile.user_id && activeProfile.user_id !== user.id) {
+      setSubmitError("You can only book appointments for your own profiles.");
+      return;
+    }
 
     // Validation
     if (mode === "unicare" && !doctor) return;
@@ -306,6 +377,10 @@ export default function BookAppointmentModal({ onClose, onSuccess }: BookAppoint
         }
       }
 
+      // UniCare bookings → pending (requires doctor confirmation)
+      // General bookings → upcoming (self-managed, no doctor on platform)
+      const appointmentStatus = mode === "unicare" ? "pending" : "upcoming";
+
       await createAppointment({
         profileId: activeProfile.id,
         title: resolvedTitle,
@@ -314,10 +389,23 @@ export default function BookAppointmentModal({ onClose, onSuccess }: BookAppoint
         location: resolvedLocation,
         date: appointmentDate,
         notes: encodedNotes,
-        status: "upcoming",
+        status: appointmentStatus,
+        source: "patient_app",
+        idempotencyKey: idempotencyKeyRef.current,
         packetId,
         timezone: "Asia/Kolkata",
       });
+
+      // Log appointment creation
+      try {
+        const { supabase } = await import("@/lib/supabase");
+        supabase.from("audit_logs").insert({
+          event_type: "appointment_created_pending",
+          actor_id: user?.id ?? null,
+          target_id: activeProfile.id,
+          payload: { mode, doctor_id: resolvedDoctorId ?? null, status: appointmentStatus },
+        }).then(() => {});
+      } catch { /* non-critical */ }
 
       onSuccess();
       onClose();
@@ -385,25 +473,43 @@ export default function BookAppointmentModal({ onClose, onSuccess }: BookAppoint
         <label className="block text-label-md font-bold tracking-widest text-on-surface-variant uppercase mb-3 ml-1">
           Clinic Code
         </label>
-        <div className="relative">
-          <input
-            id="clinic-code-input"
-            type="text"
-            value={code}
-            onChange={(e) => handleCodeChange(e.target.value)}
-            placeholder="e.g. DR3F2A"
-            maxLength={6}
-            autoComplete="off"
-            className="w-full bg-surface-container-high rounded-[1.5rem] p-5 pr-14 text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-4 focus:ring-tertiary/20 transition-all font-manrope placeholder:text-outline-variant text-2xl font-bold tracking-[0.3em] uppercase shadow-sm"
-          />
-          <div className="absolute right-4 top-1/2 -translate-y-1/2">
-            {lookingUp ? (
-              <Loader2 className="w-5 h-5 text-tertiary animate-spin" />
-            ) : doctor ? (
-              <CheckCircle2 className="w-5 h-5 text-secondary" />
+
+        {/* Scan + Manual row */}
+        <div className="flex gap-2 mb-3">
+          <button
+            type="button"
+            onClick={() => setShowScanner(true)}
+            disabled={scanResolving}
+            className="flex items-center gap-2 px-4 py-3 rounded-[1.25rem] bg-tertiary/10 text-tertiary hover:bg-tertiary hover:text-on-tertiary border border-tertiary/20 font-bold text-label-md transition-all shrink-0 disabled:opacity-50"
+          >
+            {scanResolving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <Search className="w-5 h-5 text-outline" />
+              <ScanLine className="w-4 h-4" />
             )}
+            {scanResolving ? "Resolving…" : "Scan QR"}
+          </button>
+
+          <div className="relative flex-1">
+            <input
+              id="clinic-code-input"
+              type="text"
+              value={code}
+              onChange={(e) => handleCodeChange(e.target.value)}
+              placeholder="e.g. DR3F2A"
+              maxLength={6}
+              autoComplete="off"
+              className="w-full bg-surface-container-high rounded-[1.5rem] p-4 pr-12 text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-4 focus:ring-tertiary/20 transition-all font-manrope placeholder:text-outline-variant text-xl font-bold tracking-[0.25em] uppercase shadow-sm"
+            />
+            <div className="absolute right-4 top-1/2 -translate-y-1/2">
+              {lookingUp ? (
+                <Loader2 className="w-5 h-5 text-tertiary animate-spin" />
+              ) : doctor ? (
+                <CheckCircle2 className="w-5 h-5 text-secondary" />
+              ) : (
+                <Search className="w-5 h-5 text-outline" />
+              )}
+            </div>
           </div>
         </div>
 
@@ -697,6 +803,14 @@ export default function BookAppointmentModal({ onClose, onSuccess }: BookAppoint
         {mode === "unicare" && renderUnicare()}
         {mode === "general" && renderGeneral()}
       </div>
+
+      {/* Camera scanner overlay */}
+      {showScanner && (
+        <QrScannerModal
+          onScan={handleScanResult}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
     </div>
   );
 }

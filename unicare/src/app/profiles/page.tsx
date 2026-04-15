@@ -3,11 +3,13 @@
 import React, { useState } from "react";
 import { 
   Users, Plus, Edit2, Trash2, Calendar, Shield, 
-  ChevronRight, AlertTriangle, Loader2, Phone, Droplets
+  ChevronRight, AlertTriangle, Loader2, Phone, Droplets,
+  QrCode, ChevronDown,
 } from "lucide-react";
 import { useProfile } from "@/components/auth/ProfileContext";
 import { deleteProfile, getAvatarInitials, Profile } from "@/services/profilesService";
 import AddProfileModal from "@/components/ui/AddProfileModal";
+import ProfileQrCard from "@/components/ui/ProfileQrCard";
 
 export default function ProfilesPage() {
   const { profiles, activeProfile, setActiveProfile, refreshProfiles, loading } = useProfile();
@@ -15,6 +17,7 @@ export default function ProfilesPage() {
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [profileToDelete, setProfileToDelete] = useState<Profile | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [qrExpanded, setQrExpanded] = useState(false);
 
   const handleDelete = async () => {
     if (!profileToDelete) return;
@@ -174,6 +177,45 @@ export default function ProfilesPage() {
           </>
         )}
       </div>
+
+      {/* ── Patient QR Section ── */}
+      {activeProfile && (
+        <div className="space-y-4">
+          <button
+            onClick={() => setQrExpanded(!qrExpanded)}
+            className={`w-full flex items-center justify-between p-5 rounded-[2rem] border transition-all ${
+              qrExpanded
+                ? "bg-primary/5 border-primary/20 shadow-sm"
+                : "bg-surface-container-low border-outline-variant/20 hover:bg-surface-container-high"
+            }`}
+          >
+            <div className="flex items-center gap-4">
+              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
+                qrExpanded ? "bg-primary text-on-primary" : "bg-primary/10 text-primary"
+              }`}>
+                <QrCode className="w-5 h-5" />
+              </div>
+              <div className="text-left">
+                <p className="text-label-lg font-bold text-on-surface">My Patient QR</p>
+                <p className="text-label-sm text-on-surface-variant font-medium">
+                  Show doctors your unique patient code
+                </p>
+              </div>
+            </div>
+            <ChevronDown
+              className={`w-5 h-5 text-on-surface-variant transition-transform duration-300 shrink-0 ${
+                qrExpanded ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          {qrExpanded && (
+            <div className="animate-in slide-in-from-top-2 duration-300">
+              <ProfileQrCard profile={activeProfile} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modals */}
       {(isAddModalOpen || editingProfile) && (

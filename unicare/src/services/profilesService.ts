@@ -17,6 +17,10 @@ export interface Profile {
   blood_group?: string | null;
   avatar_color: string;
   created_at: string;
+  // Patient identity fields (auto-generated on profile creation)
+  patient_code?: string | null;
+  patient_qr_version?: number;
+  patient_code_status?: string;
 }
 
 export interface CreateProfileInput {
@@ -38,14 +42,19 @@ const AVATAR_COLORS = [
   "#344F5D", "#386A20", "#7A4F80", "#A52A2A", "#1A6B6B",
 ];
 
-export const getUserProfiles = async (): Promise<Profile[]> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+export const getUserProfiles = async (userId?: string): Promise<Profile[]> => {
+  // Accept userId from context to avoid an extra auth.getUser() round-trip
+  let uid = userId;
+  if (!uid) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+    uid = user.id;
+  }
 
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", uid)
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -71,16 +80,20 @@ export const getUserProfiles = async (): Promise<Profile[]> => {
   return uniqueProfiles;
 };
 
-export const createProfile = async (input: CreateProfileInput): Promise<Profile> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+export const createProfile = async (input: CreateProfileInput, userId?: string): Promise<Profile> => {
+  let uid = userId;
+  if (!uid) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+    uid = user.id;
+  }
 
   const color = input.avatar_color || AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 
   const { data, error } = await supabase
     .from("profiles")
     .insert({
-      user_id: user.id,
+      user_id: uid,
       name: input.name,
       relation: input.relation,
       dob: input.dob || null,
@@ -114,15 +127,28 @@ export const deleteProfile = async (profileId: string): Promise<void> => {
  * If not, creates one from user metadata and migrates legacy records.
  * Returns the Self profile.
  */
-export const ensureSelfProfile = async (): Promise<Profile> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+export const ensureSelfProfile = async (user?: { id: string; email?: string; user_metadata?: any }): Promise<Profile> => {
+  let userId: string;
+  let userEmail: string | undefined;
+  let userMeta: any;
+
+  if (user) {
+    userId = user.id;
+    userEmail = user.email;
+    userMeta = user.user_metadata;
+  } else {
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) throw new Error("Not authenticated");
+    userId = authUser.id;
+    userEmail = authUser.email;
+    userMeta = authUser.user_metadata;
+  }
 
   // Check if Self profile already exists
   const { data: existing, error: fetchError } = await supabase
     .from("profiles")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("relation", "Self")
     .order("created_at", { ascending: true })
     .limit(1)
@@ -135,13 +161,13 @@ export const ensureSelfProfile = async (): Promise<Profile> => {
   if (existing) return existing as Profile;
 
   // Create Self profile from user metadata
-  const rawName = user.user_metadata?.full_name || user.user_metadata?.name;
-  const name = rawName || user.email?.split("@")[0] || "Me";
+  const rawName = userMeta?.full_name || userMeta?.name;
+  const name = rawName || userEmail?.split("@")[0] || "Me";
 
   const { data: newProfile, error } = await supabase
     .from("profiles")
     .insert({
-      user_id: user.id,
+      user_id: userId,
       name,
       relation: "Self",
       avatar_color: AVATAR_COLORS[0],
@@ -155,7 +181,7 @@ export const ensureSelfProfile = async (): Promise<Profile> => {
   await supabase
     .from("records")
     .update({ profile_id: newProfile.id })
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .is("profile_id", null);
 
   return newProfile as Profile;

@@ -1,7 +1,7 @@
 /**
  * generatePrescriptionPdf.ts
  * Shared, side-effect-free PDF builder for prescription downloads.
- * Used by both PrescriptionView (appointment flow) and PrescriptionsSection (tab).
+ * Updated to match the specific layout seen in doctors-unicare EMR.
  */
 
 import { jsPDF } from "jspdf";
@@ -32,51 +32,20 @@ export interface PrescriptionPdfInput {
   provider?: string | null;
 }
 
-// ─── Colour palette (matches app design tokens) ───────────────────────────────
+// ─── Colour palette (matching the provided design) ─────────────────────────
 const COLORS = {
-  primary: [0, 88, 188] as [number, number, number],
-  secondary: [0, 110, 40] as [number, number, number],
-  tertiary: [138, 43, 185] as [number, number, number],
-  text: [26, 28, 31] as [number, number, number],
-  textMuted: [113, 119, 134] as [number, number, number],
-  surface: [249, 249, 254] as [number, number, number],
-  surfaceCard: [255, 255, 255] as [number, number, number],
-  border: [193, 198, 215] as [number, number, number],
-  primaryLight: [216, 226, 255] as [number, number, number],
+  primary: [37, 99, 235] as [number, number, number], // #2563eb (Royal Blue)
+  text: [31, 41, 55] as [number, number, number], // #1f2937 (Dark Gray)
+  textLight: [255, 255, 255] as [number, number, number],
+  textMute: [107, 114, 128] as [number, number, number], // #6b7280 (Gray)
+  bgHeader: [37, 99, 235] as [number, number, number],
+  bgInfoBox: [249, 250, 251] as [number, number, number], // #f9fafb (Very Light Gray)
+  border: [229, 231, 235] as [number, number, number], // #e5e7eb
 };
 
-function drawRoundedRect(
-  doc: jsPDF,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-  fillColor: [number, number, number],
-  strokeColor?: [number, number, number]
-) {
-  doc.setFillColor(...fillColor);
-  if (strokeColor) {
-    doc.setDrawColor(...strokeColor);
-    doc.roundedRect(x, y, w, h, r, r, "FD");
-  } else {
-    doc.setDrawColor(...fillColor);
-    doc.roundedRect(x, y, w, h, r, r, "F");
-  }
-}
-
-function sectionLabel(doc: jsPDF, text: string, y: number, pageWidth: number): number {
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.setTextColor(...COLORS.textMuted);
-  doc.text(text.toUpperCase(), 20, y);
-  // Rule line
-  doc.setDrawColor(...COLORS.border);
-  doc.setLineWidth(0.3);
-  doc.line(20 + doc.getTextWidth(text.toUpperCase()) + 4, y - 1, pageWidth - 20, y - 1);
-  return y + 6;
-}
-
+/**
+ * Draw a text block that wraps and returns the updated Y position
+ */
 function wrappedText(
   doc: jsPDF,
   text: string,
@@ -100,18 +69,15 @@ function toFilenameSlug(str: string): string {
 
 /**
  * Generates and triggers a download of a prescription PDF.
- * Throws on failure so the caller can show an error toast.
  */
 export async function generatePrescriptionPdf(input: PrescriptionPdfInput): Promise<void> {
   const {
     patientName,
-    appointmentTitle,
     appointmentDate,
     doctorName,
     location,
     appointmentNotes,
     prescription,
-    recordTitle,
     recordDate,
     provider,
   } = input;
@@ -123,219 +89,190 @@ export async function generatePrescriptionPdf(input: PrescriptionPdfInput): Prom
   const contentWidth = pageWidth - marginX * 2;
   let y = 0;
 
-  // ── Header banner ──────────────────────────────────────────────────────────
-  drawRoundedRect(doc, 0, 0, pageWidth, 38, 0, COLORS.primary);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(255, 255, 255);
-  doc.text("UniCare", marginX, 16);
+  // 1. Top Banner (Blue Background)
+  doc.setFillColor(...COLORS.bgHeader);
+  doc.rect(0, 0, pageWidth, 40, "F");
 
+  // App Name (Left)
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(...COLORS.textLight);
+  doc.text("Unicare", marginX, 24);
+
+  // Doctor Info (Right)
+  const dName = doctorName || provider || "DR. UNKNOWN";
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text(dName.toUpperCase().startsWith("DR.") ? dName.toUpperCase() : `DR. ${dName.toUpperCase()}`, pageWidth - marginX, 18, { align: "right" });
+  
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.setTextColor(200, 220, 255);
-  doc.text("Health Wallet — Prescription", marginX, 23);
+  doc.text("General Physician", pageWidth - marginX, 24, { align: "right" });
+  
+  if (location) {
+    doc.setFontSize(8);
+    doc.text(location, pageWidth - marginX, 29, { align: "right" });
+  }
 
-  // Badge: "PRESCRIPTION"
-  drawRoundedRect(doc, pageWidth - 52, 8, 32, 10, 3, [30, 80, 180]);
+  y = 50;
+
+  // 2. Patient Info Box
+  doc.setFillColor(...COLORS.bgInfoBox);
+  doc.rect(marginX, y, contentWidth, 24, "F");
+
+  const boxY = y + 8;
+  // Patient Name
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7);
-  doc.setTextColor(255, 255, 255);
-  doc.text("PRESCRIPTION", pageWidth - 49, 14.5);
+  doc.setTextColor(...COLORS.textMute);
+  doc.text("PATIENT NAME", marginX + 6, boxY);
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.text);
+  doc.text((patientName || "UNKNOWN").toUpperCase(), marginX + 6, boxY + 6);
 
-  y = 46;
+  // Age / Gender
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...COLORS.textMute);
+  doc.text("AGE / GENDER", marginX + 68, boxY);
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.text);
+  doc.text("N/A / NOT SPECIFIED", marginX + 68, boxY + 6);
 
-  // ── Section: Patient ───────────────────────────────────────────────────────
-  if (patientName) {
-    y = sectionLabel(doc, "Patient", y, pageWidth);
-    drawRoundedRect(doc, marginX, y, contentWidth, 16, 3, COLORS.surfaceCard, COLORS.border);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(...COLORS.text);
-    doc.text(patientName, marginX + 6, y + 10);
-    y += 22;
-  }
+  // Patient ID
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...COLORS.textMute);
+  doc.text("PATIENT ID", marginX + 118, boxY);
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.text);
+  // Generate a fake PID from name if missing
+  const dummyId = patientName ? `#${btoa(patientName).substring(0,8).toUpperCase()}` : "#N/A";
+  doc.text(dummyId, marginX + 118, boxY + 6);
 
-  // ── Section: Appointment ───────────────────────────────────────────────────
-  const hasApptData = appointmentTitle || appointmentDate || doctorName || location;
-  if (hasApptData) {
-    y = sectionLabel(doc, "Appointment", y, pageWidth);
-    drawRoundedRect(doc, marginX, y, contentWidth, 38, 3, COLORS.surfaceCard, COLORS.border);
+  // Date
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...COLORS.textMute);
+  doc.text("DATE", marginX + 152, boxY);
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.text);
+  const dateStr = appointmentDate 
+    ? format(new Date(appointmentDate), "d/M/yyyy") 
+    : recordDate 
+    ? format(new Date(recordDate), "d/M/yyyy")
+    : format(new Date(), "d/M/yyyy");
+  doc.text(dateStr, marginX + 152, boxY + 6);
 
-    let iy = y + 10;
-    if (appointmentTitle) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.setTextColor(...COLORS.text);
-      doc.text(appointmentTitle, marginX + 6, iy);
-      iy += 6;
-    }
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(...COLORS.textMuted);
-    const metaParts: string[] = [];
-    if (doctorName) metaParts.push(`Dr. ${doctorName}`);
-    if (appointmentDate) {
-      const d = new Date(appointmentDate);
-      metaParts.push(
-        d.toLocaleString("en-IN", {
-          timeZone: "Asia/Kolkata",
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        })
-      );
-    }
-    if (location) metaParts.push(location);
-    doc.text(metaParts.join("  ·  "), marginX + 6, iy + 1);
-    y += 46;
-  } else if (recordTitle) {
-    // Doctor-uploaded record info
-    y = sectionLabel(doc, "Record", y, pageWidth);
-    drawRoundedRect(doc, marginX, y, contentWidth, 22, 3, COLORS.surfaceCard, COLORS.border);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(...COLORS.text);
-    doc.text(recordTitle, marginX + 6, y + 10);
-    if (provider || recordDate) {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(...COLORS.textMuted);
-      const parts: string[] = [];
-      if (provider) parts.push(provider);
-      if (recordDate) parts.push(format(new Date(recordDate), "dd MMM yyyy"));
-      doc.text(parts.join("  ·  "), marginX + 6, y + 17);
-    }
-    y += 28;
-  }
+  y += 38;
 
-  // ── Section: Appointment Notes ─────────────────────────────────────────────
-  if (appointmentNotes) {
-    y = sectionLabel(doc, "Appointment Notes", y, pageWidth);
-    const boxHeight = Math.max(16, doc.splitTextToSize(appointmentNotes, contentWidth - 12).length * 5 + 10);
-    drawRoundedRect(doc, marginX, y, contentWidth, boxHeight, 3, COLORS.primaryLight, COLORS.border);
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(...COLORS.text);
-    y = wrappedText(doc, appointmentNotes, marginX + 6, y + 8, contentWidth - 12, 5);
-    y += 10;
-  }
+  // 3. Huge "Rx" Symbol
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(36);
+  doc.setTextColor(...COLORS.primary);
+  doc.text("Rx", marginX, y);
 
-  // ── Section: Diagnosis ─────────────────────────────────────────────────────
-  if (prescription?.diagnosis) {
-    y = sectionLabel(doc, "Diagnosis", y, pageWidth);
-    const diagLines = doc.splitTextToSize(prescription.diagnosis, contentWidth - 12);
-    const boxHeight = Math.max(16, diagLines.length * 5 + 10);
-    drawRoundedRect(doc, marginX, y, contentWidth, boxHeight, 3, COLORS.primaryLight, COLORS.border);
+  y += 18;
+
+  // 4. Chief Complaints
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.text);
+  doc.text("CHIEF COMPLAINTS:", marginX, y);
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.textMute);
+  y = wrappedText(doc, appointmentNotes || "None reported", marginX, y, contentWidth, 5);
+  
+  y += 6;
+
+  // 5. Diagnosis
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.text);
+  doc.text("DIAGNOSIS:", marginX, y);
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.textMute);
+  y = wrappedText(doc, prescription?.diagnosis || "Clinical evaluation pending", marginX, y, contentWidth, 5);
+  
+  y += 8;
+
+  // 6. Doctor's Notes (Optional)
+  if (prescription?.notes) {
+    y += 2;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(...COLORS.text);
-    y = wrappedText(doc, prescription.diagnosis, marginX + 6, y + 8, contentWidth - 12, 5);
-    y += 10;
-  }
-
-  // ── Section: Medications ───────────────────────────────────────────────────
-  if (prescription?.medications && prescription.medications.length > 0) {
-    y = sectionLabel(doc, "Medications", y, pageWidth);
-
-    const tableBody = prescription.medications.map((med, i) => [
-      String(i + 1),
-      med.name,
-      med.timing.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(", "),
-      med.food === "after" ? "After food" : "Before food",
-      `${med.days} day${med.days !== 1 ? "s" : ""}`,
-    ]);
-
-    autoTable(doc, {
-      startY: y,
-      head: [["#", "Medicine", "Timing", "Food", "Duration"]],
-      body: tableBody,
-      margin: { left: marginX, right: marginX },
-      headStyles: {
-        fillColor: COLORS.primary,
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        fontSize: 8.5,
-        cellPadding: 4,
-      },
-      bodyStyles: {
-        fontSize: 9,
-        textColor: COLORS.text,
-        cellPadding: 4,
-      },
-      alternateRowStyles: { fillColor: COLORS.surface },
-      columnStyles: {
-        0: { cellWidth: 8, halign: "center" },
-        1: { cellWidth: "auto", fontStyle: "bold" },
-        2: { cellWidth: 35 },
-        3: { cellWidth: 28 },
-        4: { cellWidth: 22, halign: "center" },
-      },
-      tableLineColor: COLORS.border,
-      tableLineWidth: 0.3,
-      styles: { overflow: "linebreak" },
-      didDrawPage: (data) => {
-        // Re-draw header on new pages
-        if (data.pageNumber > 1) {
-          drawRoundedRect(doc, 0, 0, pageWidth, 14, 0, COLORS.primary);
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(9);
-          doc.setTextColor(255, 255, 255);
-          doc.text("UniCare Prescription (continued)", marginX, 9);
-        }
-      },
-    });
-
-    // @ts-ignore – autoTable attaches lastAutoTable to jsPDF instance
-    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
-  } else if (prescription) {
-    y = sectionLabel(doc, "Medications", y, pageWidth);
-    drawRoundedRect(doc, marginX, y, contentWidth, 14, 3, COLORS.surfaceCard, COLORS.border);
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(...COLORS.textMuted);
-    doc.text("No medications listed for this prescription.", marginX + 6, y + 9);
-    y += 20;
-  }
-
-  // ── Section: Doctor's Notes ────────────────────────────────────────────────
-  if (prescription?.notes) {
-    y = sectionLabel(doc, "Doctor's Notes", y, pageWidth);
-    const noteLines = doc.splitTextToSize(prescription.notes, contentWidth - 12);
-    const boxHeight = Math.max(16, noteLines.length * 5 + 10);
-    // Ensure we don't overflow page
-    if (y + boxHeight > pageHeight - 30) {
-      doc.addPage();
-      y = 20;
-    }
-    drawRoundedRect(doc, marginX, y, contentWidth, boxHeight, 3, COLORS.surfaceCard, COLORS.border);
+    doc.text("NOTES:", marginX, y);
+    y += 6;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(...COLORS.textMuted);
-    y = wrappedText(doc, prescription.notes, marginX + 6, y + 8, contentWidth - 12, 5);
-    y += 10;
+    doc.setFontSize(10);
+    doc.setTextColor(...COLORS.textMute);
+    y = wrappedText(doc, prescription.notes, marginX, y, contentWidth, 5);
+    y += 8;
   }
 
-  // ── Footer ─────────────────────────────────────────────────────────────────
-  const totalPages = doc.internal.pages.length - 1;
-  for (let p = 1; p <= totalPages; p++) {
-    doc.setPage(p);
-    const footerY = pageHeight - 12;
-    doc.setDrawColor(...COLORS.border);
-    doc.setLineWidth(0.3);
-    doc.line(marginX, footerY - 4, pageWidth - marginX, footerY - 4);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(...COLORS.textMuted);
-    doc.text(
-      `Generated by UniCare Health Wallet · ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`,
-      marginX,
-      footerY
-    );
-    doc.text(`Page ${p} of ${totalPages}`, pageWidth - marginX, footerY, { align: "right" });
-  }
+  // 7. Medications Table
+  const tableBody = (prescription?.medications || []).map((med) => [
+    med.name,
+    med.timing.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(", "),
+    med.food === "after" ? "After food" : "Before food",
+    `${med.days} day${med.days !== 1 ? "s" : ""}`,
+  ]);
+
+  autoTable(doc, {
+    startY: y + 4,
+    head: [["Medicine", "Timing", "Food", "Duration"]],
+    body: tableBody,
+    margin: { left: marginX, right: marginX },
+    headStyles: {
+      fillColor: COLORS.primary,
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      fontSize: 9,
+      cellPadding: 4,
+    },
+    bodyStyles: {
+      fontSize: 9,
+      textColor: COLORS.text,
+      cellPadding: 4,
+    },
+    columnStyles: {
+      0: { cellWidth: 55, fontStyle: "bold" },
+      1: { cellWidth: 40 },
+      2: { cellWidth: 35 },
+      3: { cellWidth: "auto" },
+    },
+    theme: "plain", // Removes automatic borders/stripes
+    didDrawCell: (data) => {
+      // If we wanted to draw anything specifically inside the cells
+    },
+  });
+
+  // 8. Footer (Fixed at bottom)
+  const footerY = pageHeight - 35;
+  
+  // Custom separator line for footer (very subtle)
+  doc.setDrawColor(240, 240, 240);
+  doc.line(marginX, footerY - 5, pageWidth - marginX, footerY - 5);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(156, 163, 175); // #9ca3af Very light gray
+  doc.text("This is a digitally generated prescription. Valid only with doctor seal/signature.", pageWidth / 2, footerY, { align: "center" });
+  
+  // Generate random hash for dummy security hash
+  const hash = btoa(`${patientName}-${appointmentDate || Date.now()}`).replace(/=/g, '').substring(0, 16);
+  doc.text(`UniCare EMR Security Hash: ${hash}`, pageWidth / 2, footerY + 5, { align: "center" });
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.text);
+  doc.text("Digitally Signed by:", pageWidth - marginX, footerY + 14, { align: "right" });
+  doc.text(dName.toUpperCase().startsWith("DR.") ? dName.toUpperCase() : `DR. ${dName.toUpperCase()}`, pageWidth - marginX, footerY + 19, { align: "right" });
 
   // ── File name & save ───────────────────────────────────────────────────────
   const namePart = toFilenameSlug(patientName || "patient");

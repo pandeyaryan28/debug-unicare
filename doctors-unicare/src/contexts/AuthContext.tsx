@@ -80,30 +80,66 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchDoctorProfile(session.user.id);
+    let mounted = true;
+
+    // Unconditional fallback: if everything hangs, release the loading UI after 3s
+    const fallbackTimer = setTimeout(() => {
+      if (mounted) {
+        console.warn('Auth initialization fallback timeout — Releasing loading state.');
+        setLoading(false);
       }
-    }).catch(err => {
-      console.error('Session fetch error:', err);
-    }).finally(() => {
-      setLoading(false);
-    });
+    }, 3000);
+
+    const initAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            await fetchDoctorProfile(session.user.id);
+          } else {
+            setDoctorProfile(null);
+          }
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Error during initial auth check:', err);
+        if (mounted) {
+          setDoctorProfile(null);
+          setLoading(false);
+        }
+      }
+    };
+
+    initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchDoctorProfile(session.user.id);
-      } else {
-        setDoctorProfile(null);
+      
+      try {
+        if (session?.user) {
+          await fetchDoctorProfile(session.user.id);
+        } else {
+          setDoctorProfile(null);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      clearTimeout(fallbackTimer);
+    };
   }, []);
 
   const signInWithGoogle = async () => {
@@ -121,11 +157,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setUser(null);
-    setSession(null);
-    setDoctorProfile(null);
+    try {
+      // 1. Immediately clear local UI state for snappy response
+      setUser(null);
+      setSession(null);
+      setDoctorProfile(null);
+
+      // 2. Attempt to clear Supabase session (use local scope to bypass network errors)
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) throw error;
+    } catch (err) {
+      console.warn('Sign out error:', err);
+      // Fallback: forcefully clear storage and reload
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.reload();
+    }
   };
 
   return (
