@@ -6,9 +6,11 @@ import { X, Camera, CameraOff, Zap, ZapOff, AlertCircle, Loader2 } from "lucide-
 interface QrScannerModalProps {
   onScan: (raw: string) => void;
   onClose: () => void;
+  /** Called when user submits a manual code instead of scanning */
+  onManualCode?: (code: string) => void;
 }
 
-export default function QrScannerModal({ onScan, onClose }: QrScannerModalProps) {
+export default function QrScannerModal({ onScan, onClose, onManualCode }: QrScannerModalProps) {
   const scannerContainerId = "qr-scanner-region";
   const scannerRef = useRef<import("html5-qrcode").Html5Qrcode | null>(null);
   const [status, setStatus] = useState<"loading" | "scanning" | "error">("loading");
@@ -17,6 +19,7 @@ export default function QrScannerModal({ onScan, onClose }: QrScannerModalProps)
   const [torchSupported, setTorchSupported] = useState(false);
   const startedRef = useRef(false);
   const scannedRef = useRef(false);
+  const [manualCode, setManualCode] = useState("");
 
   useEffect(() => {
     let scanner: import("html5-qrcode").Html5Qrcode | null = null;
@@ -206,6 +209,43 @@ export default function QrScannerModal({ onScan, onClose }: QrScannerModalProps)
             <p className="text-label-sm text-on-surface-variant font-medium text-center">
               Hold steady — scanning automatically
             </p>
+          )}
+
+          {/* Manual code fallback — only shown if parent wants it */}
+          {onManualCode && (
+            <div className="w-full space-y-3 pt-2">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-outline-variant/30" />
+                <p className="text-label-sm font-bold text-on-surface-variant/60 uppercase tracking-wider shrink-0">
+                  OR Enter Doctor / Clinic Code
+                </p>
+                <div className="flex-1 h-px bg-outline-variant/30" />
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={manualCode}
+                  onChange={(e) => setManualCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
+                  placeholder="e.g. DR3F2A"
+                  maxLength={6}
+                  autoComplete="off"
+                  className="flex-1 bg-surface-container-high rounded-[1.25rem] px-5 py-3.5 text-on-surface focus:outline-none focus:ring-4 focus:ring-tertiary/20 transition-all font-manrope placeholder:text-outline-variant text-lg font-bold tracking-[0.25em] uppercase shadow-sm border border-outline-variant/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (manualCode.length === 6) {
+                      onManualCode(manualCode);
+                      onClose();
+                    }
+                  }}
+                  disabled={manualCode.length !== 6}
+                  className="px-5 py-3.5 bg-tertiary text-on-tertiary rounded-[1.25rem] font-bold text-label-md disabled:opacity-40 hover:bg-tertiary/90 transition-all shrink-0"
+                >
+                  Go
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>

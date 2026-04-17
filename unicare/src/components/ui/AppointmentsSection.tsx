@@ -20,6 +20,8 @@ interface AppointmentsSectionProps {
   loading: boolean;
   onRefresh: () => void;
   patientName: string;
+  openBookingOnLoad?: boolean;
+  initialClinicCode?: string;
 }
 
 export default function AppointmentsSection({
@@ -28,10 +30,18 @@ export default function AppointmentsSection({
   loading,
   onRefresh,
   patientName,
+  openBookingOnLoad = false,
+  initialClinicCode,
 }: AppointmentsSectionProps) {
   const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(openBookingOnLoad);
+
+  useEffect(() => {
+    if (openBookingOnLoad) {
+      setShowBookingModal(true);
+    }
+  }, [openBookingOnLoad]);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [modalPrescription, setModalPrescription] = useState<Prescription | null>(null);
   const [viewingPrescription, setViewingPrescription] = useState(false);
@@ -224,6 +234,7 @@ export default function AppointmentsSection({
         <BookAppointmentModal
           onClose={() => setShowBookingModal(false)}
           onSuccess={onRefresh}
+          initialClinicCode={initialClinicCode}
         />
       )}
 

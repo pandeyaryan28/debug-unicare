@@ -25,6 +25,7 @@ const QrScannerModal = dynamic(() => import("./QrScannerModal"), { ssr: false })
 interface BookAppointmentModalProps {
   onClose: () => void;
   onSuccess: () => void;
+  initialClinicCode?: string;
 }
 
 type BookingMode = "choose" | "unicare" | "general";
@@ -196,7 +197,7 @@ function PacketSection({
 
 // ─── Main modal ───────────────────────────────────────────────────────────────
 
-export default function BookAppointmentModal({ onClose, onSuccess }: BookAppointmentModalProps) {
+export default function BookAppointmentModal({ onClose, onSuccess, initialClinicCode }: BookAppointmentModalProps) {
   const { activeProfile } = useProfile();
   const { user } = useAuth();
   const [mode, setMode] = useState<BookingMode>("choose");
@@ -208,6 +209,25 @@ export default function BookAppointmentModal({ onClose, onSuccess }: BookAppoint
   const [lookingUp, setLookingUp] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [doctor, setDoctor] = useState<ClinicCode | null>(null);
+
+  useEffect(() => {
+    if (initialClinicCode) {
+      setMode("unicare");
+      const val = initialClinicCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+      setCode(val);
+      if (val.length === 6) {
+        setLookingUp(true);
+        setCodeError(null);
+        lookupClinicCode(val)
+          .then((result) => {
+            if (!result) setCodeError("Clinic code not found. Check with your doctor's clinic.");
+            else setDoctor(result);
+          })
+          .catch(() => setCodeError("Something went wrong. Please try again."))
+          .finally(() => setLookingUp(false));
+      }
+    }
+  }, [initialClinicCode]);
 
   // ── General flow state ──
   const [genTitle, setGenTitle] = useState("");

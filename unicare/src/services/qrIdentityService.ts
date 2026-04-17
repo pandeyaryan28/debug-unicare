@@ -72,18 +72,42 @@ export const resolveDoctorFromScannedQr = async (
 ): Promise<ClinicCode | null> => {
   if (!rawScan?.trim()) return null;
 
-  // Try to parse as JSON first (e.g. {"v":1,"type":"doctor","code":"DR3F2A"})
+  const trimmed = rawScan.trim();
   let extractedCode = "";
+
   try {
-    const parsed = JSON.parse(rawScan.trim());
+    // a) JSON payload { code: ... }
+    const parsed = JSON.parse(trimmed);
     if (parsed?.code && typeof parsed.code === "string") {
       extractedCode = parsed.code;
     }
   } catch {
-    // Not JSON — try raw 6-char alphanumeric code
-    const match = rawScan.trim().match(/[A-Z0-9]{6}/i);
-    if (match) {
-      extractedCode = match[0].toUpperCase();
+    // Not JSON
+  }
+
+  // b) & c) URL query param `code` or legacy `d`
+  if (!extractedCode) {
+    try {
+      const urlObj = new URL(trimmed.startsWith("http") ? trimmed : `https://dummy.com/${trimmed.replace(/^\/+/, "")}`);
+      extractedCode = urlObj.searchParams.get("code") || urlObj.searchParams.get("d") || "";
+    } catch {
+      // Ignore
+    }
+  }
+
+  // d) fallback token regex
+  if (!extractedCode) {
+    const tokens = trimmed.split(/[^A-Za-z0-9]/).filter(Boolean);
+    // Prefer DR-prefixed exactly 6 chars
+    const drToken = tokens.find((t) => t.toUpperCase().startsWith("DR") && t.length === 6);
+    if (drToken) {
+      extractedCode = drToken;
+    } else {
+      // Take first 6-char alphanumeric
+      const any6 = tokens.find((t) => t.length === 6);
+      if (any6) {
+        extractedCode = any6;
+      }
     }
   }
 

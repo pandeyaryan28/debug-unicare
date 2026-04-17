@@ -1,20 +1,36 @@
 "use client";
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import Login from "@/components/auth/Login";
 import RecordsList from "@/components/ui/RecordsList";
 import VisitPacketBuilder from "@/components/ui/VisitPacketBuilder";
+import ProfileQrCard from "@/components/ui/ProfileQrCard";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { getProfileRecords } from "@/services/recordsService";
 import { getProfileAppointments, Appointment } from "@/services/appointmentsService";
 import { useProfile } from "@/components/auth/ProfileContext";
-import { Loader2, CalendarCheck, ChevronRight, Clock, BellRing, CheckCircle2 } from "lucide-react";
+import { Loader2, CalendarCheck, ChevronRight, Clock, BellRing, CheckCircle2, ScanLine, QrCode } from "lucide-react";
+import BookAppointmentModal from "@/components/ui/BookAppointmentModal";
+import dynamic from "next/dynamic";
+import { resolveDoctorFromScannedQr } from "@/services/qrIdentityService";
+
+// Dynamically import scanner to avoid SSR issues
+const QrScannerModal = dynamic(() => import("@/components/ui/QrScannerModal"), { ssr: false });
 
 function DashboardContent() {
   const { user } = useAuth();
   const { activeProfile } = useProfile();
+
+  // Booking modal state
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [prefillClinicCode, setPrefillClinicCode] = useState<string | undefined>(undefined);
+
+  // Scan-to-Book flow state
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanResolving, setScanResolving] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+
+  // Dashboard data
   const [recordCount, setRecordCount] = useState<number | null>(null);
   const [newTodayCount, setNewTodayCount] = useState<number>(0);
   const [upcomingAppts, setUpcomingAppts] = useState<Appointment[]>([]);
@@ -35,6 +51,14 @@ function DashboardContent() {
     });
   }, [activeProfile?.id]);
 
+  const refreshAppointments = () => {
+    if (!activeProfile) return;
+    getProfileAppointments(activeProfile.id).then((appts) => {
+      setUpcomingAppts(
+        appts.filter((a) => a.status === "upcoming" || a.status === "confirmed" || a.status === "checked_in")
+      );
+    });
+  };
 
   const getTimeGreeting = () => {
     const hour = new Date().getHours();
@@ -48,6 +72,52 @@ function DashboardContent() {
     const fullName = user.user_metadata?.full_name || user.user_metadata?.name;
     if (fullName) return fullName.split(" ")[0];
     return user.email?.split("@")[0] || "User";
+  };
+
+  // ── Scan-to-Book: handle the raw QR scan result ──
+  const handleScanResult = async (raw: string) => {
+    setShowScanner(false);
+    setScanResolving(true);
+    setScanError(null);
+
+    // Audit log (fire-and-forget)
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      supabase.from("audit_logs").insert({
+        event_type: "scan_attempt",
+        actor_id: user?.id ?? null,
+        payload: { raw_length: raw.length },
+      }).then(() => {});
+    } catch { /* non-critical */ }
+
+    try {
+      const resolved = await resolveDoctorFromScannedQr(raw);
+      if (!resolved) {
+        setScanError("Could not identify a valid doctor QR. Try entering the code manually.");
+        setScanResolving(false);
+        return;
+      }
+      // Open booking modal pre-filled with the resolved clinic code
+      setPrefillClinicCode(resolved.code);
+      setShowBookingModal(true);
+    } catch {
+      setScanError("Scan resolution failed. Please try again or enter the code manually.");
+    } finally {
+      setScanResolving(false);
+    }
+  };
+
+  // ── Scan-to-Book: manual code fallback from scanner modal ──
+  const handleManualCode = (code: string) => {
+    setShowScanner(false);
+    setPrefillClinicCode(code);
+    setShowBookingModal(true);
+  };
+
+  const openScanToBook = () => {
+    setScanError(null);
+    setPrefillClinicCode(undefined);
+    setShowScanner(true);
   };
 
   return (
@@ -94,6 +164,19 @@ function DashboardContent() {
               </div>
             </div>
           </div>
+
+          {/* ── Patient QR & Code ── */}
+          {activeProfile && (
+            <div className="mt-8 mb-2">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                  <QrCode className="w-4 h-4" />
+                </div>
+                <h2 className="text-display-sm font-manrope font-bold text-on-surface">Your Patient QR</h2>
+              </div>
+              <ProfileQrCard profile={activeProfile} />
+            </div>
+          )}
 
           {/* Appointments compact card */}
           <div className="mt-10 mb-2">
@@ -154,9 +237,61 @@ function DashboardContent() {
                 )}
               </div>
             )}
+
+            {/* Scan to Book CTA */}
+            {scanError && (
+              <div className="mt-3 flex items-center gap-2.5 p-3.5 bg-error/10 text-error rounded-2xl text-label-sm font-medium">
+                <span className="shrink-0">⚠</span>
+                {scanError}
+              </div>
+            )}
+            <button
+              onClick={openScanToBook}
+              disabled={scanResolving}
+              className="mt-4 w-full flex items-center justify-between p-5 bg-tertiary text-on-tertiary rounded-[2rem] shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all group disabled:opacity-60 disabled:hover:scale-100"
+            >
+              <div className="flex items-center gap-4 text-left">
+                <div className="w-12 h-12 rounded-2xl bg-on-tertiary/20 flex items-center justify-center">
+                  {scanResolving
+                    ? <Loader2 className="w-6 h-6 animate-spin" />
+                    : <ScanLine className="w-6 h-6" />
+                  }
+                </div>
+                <div>
+                  <p className="text-body-lg font-bold">
+                    {scanResolving ? "Resolving doctor…" : "Scan to Book"}
+                  </p>
+                  <p className="text-label-md font-medium text-on-tertiary/80">
+                    {scanResolving ? "Please wait…" : "Scan a doctor's QR code to book instantly"}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-6 h-6 shrink-0 group-hover:translate-x-1 transition-transform" />
+            </button>
           </div>
 
           <VisitPacketBuilder />
+
+          {/* QR Scanner overlay — opened directly from Scan to Book */}
+          {showScanner && (
+            <QrScannerModal
+              onScan={handleScanResult}
+              onClose={() => setShowScanner(false)}
+              onManualCode={handleManualCode}
+            />
+          )}
+
+          {/* Booking modal — opened after scan resolves with prefilled clinic code */}
+          {showBookingModal && (
+            <BookAppointmentModal
+              initialClinicCode={prefillClinicCode}
+              onClose={() => {
+                setShowBookingModal(false);
+                setPrefillClinicCode(undefined);
+              }}
+              onSuccess={refreshAppointments}
+            />
+          )}
 
           <RecordsList />
         </main>

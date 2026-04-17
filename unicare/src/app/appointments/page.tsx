@@ -1,14 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import AppointmentsSection from "@/components/ui/AppointmentsSection";
 import { getProfileAppointments, Appointment } from "@/services/appointmentsService";
 import { useProfile } from "@/components/auth/ProfileContext";
+import { useSearchParams } from "next/navigation";
 
-export default function AppointmentsPage() {
+function AppointmentsPageContent() {
   const { activeProfile } = useProfile();
+  const searchParams = useSearchParams();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const bookOpen = searchParams.get("book") === "1";
+  const initialCode = searchParams.get("code") || searchParams.get("d") || undefined;
 
   const fetchAppointments = useCallback(async () => {
     if (!activeProfile) return;
@@ -50,8 +55,19 @@ export default function AppointmentsPage() {
           loading={loading}
           onRefresh={fetchAppointments}
           patientName={activeProfile?.name || "Patient"}
+          openBookingOnLoad={bookOpen}
+          initialClinicCode={initialCode}
         />
       </div>
     </div>
   );
 }
+
+export default function AppointmentsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-on-surface-variant font-medium">Loading appointments...</div>}>
+      <AppointmentsPageContent />
+    </Suspense>
+  );
+}
+
