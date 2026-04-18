@@ -99,6 +99,7 @@ export const isDoctorUploadedPrescription = isDoctorConsultationPrescription;
 /**
  * Classify appointment-derived prescriptions.
  * One entry per prescription row that links to any appointment of the profile.
+ * Also handles walk-in / QR / UC-code prescriptions where appointment_id IS NULL.
  */
 export function classifyAppointmentPrescriptions(
   appointments: Appointment[],
@@ -108,13 +109,20 @@ export function classifyAppointmentPrescriptions(
 
   return prescriptions
     .map((rx): ClassifiedPrescription => {
-      const appt = apptMap.get(rx.appointment_id);
+      // appointment_id may be null for walk-in / QR / UC-code consultations
+      const appt = rx.appointment_id ? apptMap.get(rx.appointment_id) : undefined;
+      // Prefer appointment title, fall back to diagnosis, then generic
+      const title = appt?.title ?? (rx.diagnosis ? `Consultation — ${rx.diagnosis}` : "Consultation");
+      // Prefer appointment doctor label, fall back to prescription's own doctor_name
+      const doctor = appt?.doctor ?? rx.doctor_name ?? null;
+      // Use issued_at if available (more accurate), otherwise created_at
+      const date = rx.issued_at ?? rx.created_at;
       return {
         key: `appt-${rx.id}`,
         source: "appointment",
-        title: appt?.title ?? "Consultation",
-        date: rx.created_at,
-        doctor: appt?.doctor ?? null,
+        title,
+        date,
+        doctor,
         prescription: rx,
         appointment: appt,
       };

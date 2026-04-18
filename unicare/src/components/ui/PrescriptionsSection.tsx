@@ -11,6 +11,7 @@ import { useProfile } from "@/components/auth/ProfileContext";
 import {
   getProfileAppointments,
   getPrescription,
+  getAllProfilePrescriptions,
   Appointment,
   Prescription,
 } from "@/services/appointmentsService";
@@ -321,20 +322,31 @@ export default function PrescriptionsSection() {
         getProfileRecords(activeProfile.id),
       ]);
 
-      // Fetch structured prescriptions for all completed appointments
+      // ── Path 1: appointment-linked prescriptions (existing, unchanged) ──
       const completedAppts = appointments.filter((a) => a.status === "completed");
       const prescriptionResults = await Promise.all(
         completedAppts.map((a) =>
           getPrescription(a.id, a.profile_id).catch(() => null)
         )
       );
-      const prescriptions = prescriptionResults.filter((p): p is Prescription => p !== null);
+      const appointmentLinked = prescriptionResults.filter((p): p is Prescription => p !== null);
 
-      const apptRx = classifyAppointmentPrescriptions(appointments, prescriptions);
+      // ── Path 2: profile-level fallback — surfaces walk-in / QR / UC-code ──
+      const allProfilePrescriptions = await getAllProfilePrescriptions(activeProfile.id);
+
+      // ── Merge + dedupe by prescription.id (stable PK, appointment-linked wins) ──
+      const seen = new Set<string>();
+      const merged: Prescription[] = [...appointmentLinked, ...allProfilePrescriptions].filter((rx) => {
+        if (seen.has(rx.id)) return false;
+        seen.add(rx.id);
+        return true;
+      });
+
+      const apptRx = classifyAppointmentPrescriptions(appointments, merged);
       const uploadedRx = classifyDoctorUploadedPrescriptions(records);
-      const merged = mergeAndSortPrescriptions(apptRx, uploadedRx);
+      const sortedItems = mergeAndSortPrescriptions(apptRx, uploadedRx);
 
-      setAllItems(merged);
+      setAllItems(sortedItems);
     } catch (err) {
       console.error("Failed to load prescriptions:", err);
       showToast({ type: "error", message: "Failed to load prescriptions." });

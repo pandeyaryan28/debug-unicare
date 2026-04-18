@@ -38,7 +38,7 @@ function AppointmentsPageContent() {
   // Consider completed or cancelled past date as "past"
   // Keep everything else as upcoming
   const upcomingAppointments = appointments.filter(
-    (a) => a.status === "upcoming" || a.status === "confirmed" || a.status === "checked_in" 
+    (a) => a.status === "pending" || a.status === "upcoming" || a.status === "confirmed" || a.status === "checked_in"
       || (a.status === "cancelled" && a.date >= now)
   );
   

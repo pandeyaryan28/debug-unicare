@@ -110,12 +110,23 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   const setActiveProfile = useCallback(
     (profile: Profile) => {
+      // D) Multi-profile isolation assertion — dev/debug only, no prod impact.
+      // Warns if a profile from a different user is accidentally set as active.
+      if (process.env.NODE_ENV !== "production") {
+        const owned = profiles.some((p) => p.id === profile.id);
+        if (!owned) {
+          console.warn(
+            `[ProfileContext] ISOLATION WARNING: setActiveProfile called with profile.id "${profile.id}" ` +
+            `which is not in the current user's profiles list. This may indicate a cross-profile identity leak.`
+          );
+        }
+      }
       setActiveProfileState(profile);
       if (user) {
         localStorage.setItem(`unicare_active_profile_${user.id}`, profile.id);
       }
     },
-    [user]
+    [user, profiles]
   );
 
   return (

@@ -46,8 +46,8 @@ function DashboardContent() {
     });
     getProfileAppointments(activeProfile.id).then((appts) => {
       setUpcomingAppts(
-        appts.filter((a) => a.status === "upcoming" || a.status === "confirmed" || a.status === "checked_in")
-      );
+          appts.filter((a) => a.status === "pending" || a.status === "upcoming" || a.status === "confirmed" || a.status === "checked_in")
+        );
     });
   }, [activeProfile?.id]);
 
@@ -55,7 +55,7 @@ function DashboardContent() {
     if (!activeProfile) return;
     getProfileAppointments(activeProfile.id).then((appts) => {
       setUpcomingAppts(
-        appts.filter((a) => a.status === "upcoming" || a.status === "confirmed" || a.status === "checked_in")
+        appts.filter((a) => a.status === "pending" || a.status === "upcoming" || a.status === "confirmed" || a.status === "checked_in")
       );
     });
   };

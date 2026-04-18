@@ -50,7 +50,7 @@ export default function AppointmentsSection({
   const [downloadingPdfFor, setDownloadingPdfFor] = useState<string | null>(null);
 
   // Group appointments
-  const pendingAppointments = upcomingAppointments.filter((a) => a.status === "upcoming" || a.status === "confirmed");
+  const pendingAppointments = upcomingAppointments.filter((a) => a.status === "pending" || a.status === "upcoming" || a.status === "confirmed");
   const checkedInAppointments = upcomingAppointments.filter((a) => a.status === "checked_in");
 
   const handleCancelClick = async (appointment: Appointment) => {

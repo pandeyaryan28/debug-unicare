@@ -81,12 +81,20 @@ export interface MedicationItem {
 
 export interface Prescription {
   id: string;
-  appointment_id: string;
+  appointment_id: string | null;
   profile_id: string;
   doctor_id: string;
   diagnosis: string | null;
+  symptoms: string | null;
   medications: MedicationItem[];
   notes: string | null;
+  doctor_name: string | null;
+  doctor_specialty: string | null;
+  clinic_name: string | null;
+  clinic_address: string | null;
+  doctor_phone: string | null;
+  issued_at: string | null;
+  idempotency_key: string | null;
   created_at: string;
 }
 
@@ -103,6 +111,28 @@ export const getPrescription = async (
 
   if (error || !data) return null;
   return data as Prescription;
+};
+
+/**
+ * Profile-level fallback: return ALL prescriptions for a profile, ordered
+ * newest first by issued_at.  Surfaces walk-in / QR / UC-code consultations
+ * where appointment_id IS NULL, as well as any doctor-confirmed appointments
+ * whose appointment_id may be inconsistent.
+ */
+export const getAllProfilePrescriptions = async (
+  profileId: string
+): Promise<Prescription[]> => {
+  const { data, error } = await supabase
+    .from("prescriptions")
+    .select("*")
+    .eq("profile_id", profileId)
+    .order("issued_at", { ascending: false });
+
+  if (error) {
+    console.error("[getAllProfilePrescriptions] error:", error);
+    return [];
+  }
+  return (data ?? []) as Prescription[];
 };
 
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
